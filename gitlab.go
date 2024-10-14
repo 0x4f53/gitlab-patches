@@ -1,4 +1,4 @@
-package main
+package gitlabPatches
 
 import (
 	"encoding/json"
