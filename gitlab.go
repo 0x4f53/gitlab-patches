@@ -8,6 +8,7 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"sync"
 	"time"
 
 	"github.com/0x4f53/textsubs"
@@ -104,24 +105,64 @@ func getCommits(perPage int, projectID int) ([]Commit, error) {
 func curl(url string) string {
 	response, err := http.Get(url)
 	if err != nil {
-		//log.Fatalf("Error fetching the URL: %v", err)
+		return ""
 	}
 	defer response.Body.Close()
 
 	if response.StatusCode != http.StatusOK {
-		//log.Fatalf("Error: received status code %d", response.StatusCode)
+		return ""
 	}
 
-	body, err := ioutil.ReadAll(response.Body)
+	body, err := io.ReadAll(response.Body)
 	if err != nil {
-		//log.Fatalf("Error reading response body: %v", err)
+		return ""
 	}
 
 	return string(body)
 }
 
+func fetchCommitsForProject(project Project, perPage int, outputChannel chan<- MergedOutput, wg *sync.WaitGroup) {
+	defer wg.Done()
+
+	commits, err := getCommits(perPage, project.ID)
+	if err != nil {
+		log.Printf("Error fetching commits for project %d: %v", project.ID, err)
+		return
+	}
+
+	for _, commit := range commits {
+		commit.PatchURL = fmt.Sprintf("%s/-/commit/%s.patch", project.WebURL, commit.ID)
+
+		// Read patch data
+		commitContents := curl(commit.PatchURL)
+		associatedDomains, _ := textsubs.DomainsOnly(commitContents, false)
+		associatedDomains = textsubs.Resolve(associatedDomains)
+
+		data := MergedOutput{
+			ProjectID:         project.ID,
+			ProjectName:       project.Name,
+			ProjectPath:       project.Path,
+			ProjectNamespace:  project.Namespace.Name,
+			ProjectWebURL:     project.WebURL,
+			CommitID:          commit.ID,
+			Kind:              project.Namespace.Kind,
+			CommitShortID:     commit.ShortID,
+			CommitTitle:       commit.Title,
+			CommitMessage:     commit.Message,
+			CommitCreatedAt:   commit.CreatedAt,
+			CommitAuthorName:  commit.AuthorName,
+			CommitPatchURL:    commit.PatchURL,
+			AssociatedDomains: associatedDomains,
+		}
+
+		outputChannel <- data
+	}
+}
+
 func GetGitlabCommits(perPage int, maxCommits int) []MergedOutput {
 	var allMergedOutputs []MergedOutput
+	outputChannel := make(chan MergedOutput)
+	var wg sync.WaitGroup
 
 	page := 1
 	for len(allMergedOutputs) < maxCommits {
@@ -134,62 +175,40 @@ func GetGitlabCommits(perPage int, maxCommits int) []MergedOutput {
 		}
 
 		for _, project := range projects {
-			commits, err := getCommits(perPage, project.ID)
-			if err != nil {
-				log.Printf("Error fetching commits for project %d: %v", project.ID, err)
-				continue
-			}
+			wg.Add(1)
+			go fetchCommitsForProject(project, perPage, outputChannel, &wg)
+		}
 
-			for _, commit := range commits {
-				commit.PatchURL = fmt.Sprintf("%s/-/commit/%s.patch", project.WebURL, commit.ID)
+		go func() {
+			wg.Wait()
+			close(outputChannel)
+		}()
 
-				// Read patch data
-				commitContents := curl(commit.PatchURL)
-				associatedDomains, _ := textsubs.DomainsOnly(commitContents, false)
-				associatedDomains = textsubs.Resolve(associatedDomains)
+		for output := range outputChannel {
+			allMergedOutputs = append(allMergedOutputs, output)
 
-				data := MergedOutput{
-					ProjectID:         project.ID,
-					ProjectName:       project.Name,
-					ProjectPath:       project.Path,
-					ProjectNamespace:  project.Namespace.Name,
-					ProjectWebURL:     project.WebURL,
-					CommitID:          commit.ID,
-					Kind:              project.Namespace.Kind,
-					CommitShortID:     commit.ShortID,
-					CommitTitle:       commit.Title,
-					CommitMessage:     commit.Message,
-					CommitCreatedAt:   commit.CreatedAt,
-					CommitAuthorName:  commit.AuthorName,
-					CommitPatchURL:    commit.PatchURL,
-					AssociatedDomains: associatedDomains,
+			if *jsonOutput {
+				output, err := json.Marshal(output)
+				if err != nil {
+					log.Fatalf("Error marshalling JSON: %v", err)
 				}
-
-				allMergedOutputs = append(allMergedOutputs, data)
-
-				if *jsonOutput {
-					output, err := json.Marshal(data)
-					if err != nil {
-						log.Fatalf("Error marshalling JSON: %v", err)
-					}
-					appendToFile(timestamp()+".json", string(output)+"\n")
-					fmt.Println(string(output))
-				} else {
-					output, err := json.MarshalIndent(data, "", "  ")
-					if err != nil {
-						log.Fatalf("Error marshalling JSON: %v", err)
-					}
-					fmt.Println(string(output))
+				appendToFile(timestamp()+".json", string(output)+"\n")
+				fmt.Println(string(output))
+			} else {
+				output, err := json.MarshalIndent(output, "", "  ")
+				if err != nil {
+					log.Fatalf("Error marshalling JSON: %v", err)
 				}
-
-				if len(allMergedOutputs) >= maxCommits {
-					break
-				}
+				fmt.Println(string(output))
 			}
 
 			if len(allMergedOutputs) >= maxCommits {
 				break
 			}
+		}
+
+		if len(allMergedOutputs) >= maxCommits {
+			break
 		}
 
 		page++
