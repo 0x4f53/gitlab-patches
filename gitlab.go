@@ -16,9 +16,10 @@ import (
 
 const baseURL = "https://gitlab.com/api/v4"
 
+var gitlabCacheDir = ".gitlabCommits/"
+
 var perPage *int
 var maxCommits *int
-var jsonOutput *bool
 
 type Namespace struct {
 	Name string `json:"name"`
@@ -187,20 +188,16 @@ func GetGitlabCommits(perPage int, maxCommits int) []MergedOutput {
 		for output := range outputChannel {
 			allMergedOutputs = append(allMergedOutputs, output)
 
-			if *jsonOutput {
-				output, err := json.Marshal(output)
-				if err != nil {
-					log.Fatalf("Error marshalling JSON: %v", err)
-				}
-				appendToFile(timestamp()+".json", string(output)+"\n")
-				fmt.Println(string(output))
-			} else {
-				output, err := json.MarshalIndent(output, "", "  ")
-				if err != nil {
-					log.Fatalf("Error marshalling JSON: %v", err)
-				}
-				fmt.Println(string(output))
+			output, err := json.Marshal(output)
+			if err != nil {
+				log.Fatalf("Error marshalling JSON: %v", err)
 			}
+
+			makeDir(gitlabCacheDir)
+			filename := gitlabCacheDir + timestamp() + ".json"
+
+			appendToFile(filename, string(output)+"\n")
+			fmt.Println(string(output))
 
 			if len(allMergedOutputs) >= maxCommits {
 				break
@@ -223,6 +220,7 @@ func timestamp() string {
 }
 
 func appendToFile(filename string, data string) error {
+
 	file, err := os.OpenFile(filename, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
 	if err != nil {
 		return err
@@ -236,12 +234,26 @@ func appendToFile(filename string, data string) error {
 	return nil
 }
 
+func makeDir(dirName string) error {
+	if _, err := os.Stat(dirName); os.IsNotExist(err) {
+		err := os.MkdirAll(dirName, os.ModePerm)
+		if err != nil {
+			return fmt.Errorf("Failed to create directory: %w", err)
+		}
+	}
+	return nil
+}
+
 func main() {
-	perPage = flag.Int("per", 100, "Results to grab per page from GitLab API (max: 100)")
-	maxCommits = flag.Int("max", 100, "Maximum number of commits to grab from GitLab API (max: 1000)")
-	jsonOutput = flag.Bool("json", false, "Save as line-separated JSON in a file (filename format: <01-01-2024-0>.json)")
+	perPage = flag.Int("per", 100, "Results to grab per page from GitLab API (default: 100)")
+	maxCommits = flag.Int("max", 100, "Maximum number of commits to grab from GitLab API (default: 100)")
+	outputDir := flag.String("outputDir", gitlabCacheDir, "the directory to save files to. 'gitlabCommits/' will be made locally if not specified")
 
 	flag.Parse()
+
+	if *outputDir != "" {
+		gitlabCacheDir = *outputDir
+	}
 
 	_ = GetGitlabCommits(*perPage, *maxCommits)
 }
