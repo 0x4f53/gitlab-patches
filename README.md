@@ -11,12 +11,12 @@ go build
 ./gitlab-patches -h
 
 Usage of ./gitlab-patches:
-  -json
-        Save as line-separated JSON in a file (filename format: <01-01-2024-0>.json)
+  -output
+        Save as line-separated JSON in a file (default file format: <01-01-2024-0>.json)
   -max int
-        Maximum number of commits to grab from GitLab API (max: 1000) (default 100)
+        Maximum number of commits to grab from GitLab API (default 1000)
   -per int
-        Results to grab per page from GitLab API (max: 100) (default 100)
+        Results to grab per page from GitLab API (default 1000)
 ```
 
 # Examples
