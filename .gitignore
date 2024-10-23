@@ -28,4 +28,4 @@ go.work.sum
 gitlab-patches
 .gitlabCommits/
 
-gitlabPatches/.gitlabCommits/
+gitlab-patches-cli/.gitlabCommits/

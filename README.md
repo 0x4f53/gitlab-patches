@@ -7,16 +7,17 @@ this tool helps you scrape the last x commits pushed to gitlab (and grab their p
 # Usage
 
 ```bash
-go build
-./gitlab-patches -h
+cd gitlab-patches-cli/
+
+go run main.go
 
 Usage of ./gitlab-patches:
   -output
         Save as line-separated JSON in a file (default file format: <01-01-2024-0>.json)
   -max int
-        Maximum number of commits to grab from GitLab API (default 1000)
+        Maximum number of commits to grab from GitLab API
   -per int
-        Results to grab per page from GitLab API (default 1000)
+        Results to grab per page from GitLab API
 ```
 
 # Examples
@@ -24,7 +25,7 @@ Usage of ./gitlab-patches:
 A list of the last X patches pushed to gitlab in json format
 
 ```bash
-./gitlab-patches --json
+go run main.go --json
 ```
 
 This can be combined with a service file or a cron to automate it.
@@ -32,7 +33,7 @@ This can be combined with a service file or a cron to automate it.
 ### Output
 
 ```bash
-./gitlab-patches --json
+go run main.go --json
 
 {"project_id":62541692,"project_name":"aphysica.gitlab.io","project_path":"aphysica.gitlab.io","project_namespace":"aphysica","project_web_url":"https://gitlab.com/aphysica/aphysica.gitlab.io","kind":"user","commit_id":"ea558b0ce600c0376c76c5f0261db47f1efe2195","commit_short_id":"ea558b0c","commit_title":"index","commit_message":"index","commit_created_at":"2024-10-14T00:09:37Z","commit_author_name":"aphysica","commit_patch_url":"https://gitlab.com/aphysica/aphysica.gitlab.io/-/commit/ea558b0ce600c0376c76c5f0261db47f1efe2195.patch","associated_domains":["gitlab.com"]}
 {"project_id":62541798,"project_name":"shyameer - Security policy project","project_path":"shyameer-security-policy-project","project_namespace":"shyameer","project_web_url":"https://gitlab.com/shyamee11/shyameer-security-policy-project","kind":"group","commit_id":"e25c2a197d0a3c4d6ce871a8361304bdcdcbab88","commit_short_id":"e25c2a19","commit_title":"Initial commit","commit_message":"Initial commit","commit_created_at":"2024-10-14T00:12:03Z","commit_author_name":"tester bhai","commit_patch_url":"https://gitlab.com/shyamee11/shyameer-security-policy-project/-/commit/e25c2a197d0a3c4d6ce871a8361304bdcdcbab88.patch","associated_domains":null}
