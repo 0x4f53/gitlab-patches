@@ -2,7 +2,8 @@ package main
 
 import (
 	"flag"
-	"gitlabPatches"
+
+	gitlabPatches "github.com/0x4f53/gitlab-patches"
 )
 
 func main() {
